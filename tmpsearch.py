@@ -2,8 +2,8 @@ from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent,GroupMessageEvent, Message
 from nonebot.params import RegexGroup,CommandArg
 from requests import get
-import json
 import re
+from bs4 import BeautifulSoup
 
 __zx_plugin_name__ = "tmp查询"
 __plugin_usage__ = """
@@ -27,23 +27,19 @@ __plugin_settings__ = {
 
 tmp = on_command("tmp查询", priority=5, block=True)
 
-def search_city(string,city,start_sign,end_sign):
-    rec=str(start_sign)+'(.|\n)+'+str(end_sign)
-    string=re.search(rec,string).group()
-    city=city+r'.+</span> \(\d+\)'
-    string=re.search(city,string).group()
-    cars=re.search(r'\(\d+\)',string).group()
-    cars=cars.replace('(','')
-    cars=cars.replace(')','')
-    if re.search('Moderate',string):
+def search_city(html,id):
+    exp=BeautifulSoup(html,'html.parser')
+    cars=exp.find('span',id='traffic_players_'+str(id)).contents
+    status=exp.find('span',id='traffic_status_'+str(id)).contents
+    if status==['Moderate']:
         status='中等'
-    elif re.search('Low',string):
+    elif status==['Low'] or status==['Empty']:
         status='畅通'
-    elif re.search('Congested',string):
+    elif status==['Congested']:
         status='不怕封你就去'
-    elif re.search('Heavy',string):
+    elif status==['Heavy']:
         status='拥堵'
-    return str(cars)+' '+status
+    return ' '.join(cars+[status])
 
 def if_ban(a:bool,b:str):
         if a:
@@ -79,15 +75,15 @@ async def handle_function(event: MessageEvent,args: Message = CommandArg()):
         ans=[str(i) for i in ans]
         await tmp.finish(''.join(ans))
     if re.match('s1(服)?',str(id),re.I):
-        response=get('https://traffic.krashnz.com/')
+        response=get('https://traffic.krashnz.com/ets2/sim1')
         response=response.text
-        ans=['查询完成:\n加来小道:',search_city(response,r'Calais - Duisburg \(Road\)','Simulation 1','View traffic for Simulation 1'),'\n加来城区:',search_city(response,r'Calais \(City\)','Simulation 1','View traffic for Simulation 1'),'\n杜伊斯堡',search_city(response,r'Duisburg \(City\)','Simulation 1','View traffic for Simulation 1')]
+        ans=['查询完成:\n加来小道:',search_city(response,134),'\n加来城区:',search_city(response,55),'\n杜伊斯堡',search_city(response,14)]
         await tmp.finish(''.join(ans))
         
     if re.match('p(服)?',str(id),re.I):
-        response=get('https://traffic.krashnz.com/')
+        response=get('https://traffic.krashnz.com/promods/pm')
         response=response.text
-        ans=['查询完成:\n矿山:',search_city(response,r'Kirkenes Quarry \(Road\)','ProMods','View traffic for ProMods')]
+        ans=['查询完成:\n矿山:',search_city(response,793)]
         await tmp.finish(''.join(ans))
     if not(str(id).isdigit()):
         await tmp.finish("id输入错误！")
@@ -97,4 +93,3 @@ async def handle_function(event: MessageEvent,args: Message = CommandArg()):
         await tmp.finish("查询失败，请联系管理员")
     ans=["查询完成\nTMPid:",str(response.json()['response']['id']),"\n名称:",response.json()['response']['name'],"\n所属车队:",null_check(response.json()['response']['vtc']['name']),"\nSteamid:",str(response.json()['response']['steamID']),"\n加入日期",response.json()['response']['joinDate'],"\n是否封禁:",if_ban(response.json()['response']['banned'],response.json()['response']['bannedUntil'])]
     await tmp.finish(''.join(ans))
-        
