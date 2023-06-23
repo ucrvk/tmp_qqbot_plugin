@@ -1,7 +1,7 @@
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import MessageEvent,GroupMessageEvent, Message
-from nonebot.params import RegexGroup,CommandArg
-from requests import get
+from nonebot.adapters.onebot.v11 import Message, MessageEvent
+from nonebot.params import CommandArg
+from httpx import get
 import re
 from bs4 import BeautifulSoup
 
@@ -25,71 +25,114 @@ __plugin_settings__ = {
 }
 
 
-tmp = on_command("tmp查询", priority=5, block=True)
+tmp_id = on_command("查询", priority=5, block=True)
+tmp_sever = on_command("服务器", priority=5, block=True)
+tmp_road = on_command("路况", priority=5, block=True)
 
-def search_city(html,id):
-    exp=BeautifulSoup(html,'html.parser')
-    cars=exp.find('span',id='traffic_players_'+str(id)).contents
-    status=exp.find('span',id='traffic_status_'+str(id)).contents
-    if status==['Moderate']:
-        status='中等'
-    elif status==['Low'] or status==['Empty']:
-        status='畅通'
-    elif status==['Congested']:
-        status='不怕封你就去'
-    elif status==['Heavy']:
-        status='拥堵'
-    return ' '.join(cars+[status])
 
-def if_ban(a:bool,b:str):
-        if a:
-            return ("是\n解禁时间:"+b)
-        return "否"
+def search_city(html, id):
+    exp = BeautifulSoup(html, 'html.parser')
+    cars = exp.find('span', id='traffic_players_'+str(id)).contents
+    status = exp.find('span', id='traffic_status_'+str(id)).contents
+    if status == ['Moderate']:
+        status = '正常'
+    elif status == ['Low'] or status == ['Empty']:
+        status = '通畅'
+    elif status == ['Congested']:
+        status = '爆满'
+    elif status == ['Heavy']:
+        status = '拥堵'
+    return ' '.join(['路况:', status, '| 玩家:']+cars)
 
-def null_check(str:str):
+
+def if_ban(a: bool, b: str):
+    if a:
+        return ("是\n解禁时间:"+b)
+    return "否"
+
+
+def null_check(str: str):
     if str:
         return str
     return "无"
 
-def Detail(server,check_id,detail,output_id):
-    if server['id']==check_id:
-        detail[output_id]=[server['players'],server['queue'],server['maxplayers']]
+
+def Detail(server, check_id, detail, output_id):
+    if server['id'] == check_id:
+        detail[output_id] = [server['players'],
+                             server['queue'], server['maxplayers']]
 
 
-@tmp.handle()
-async def handle_function(event: MessageEvent,args: Message = CommandArg()):
-    id=args.extract_plain_text()
-    if not(id):
-        response=get('https://api.truckersmp.com/v2/servers')
-        detail=[[0]]
-        for server in response.json()['response']:
-            if server['id']==4:
-                detail_s1=[server['players'],server['queue'],server['maxplayers']]
-            if server['id']==41:
-                detail_s2=[server['players'],server['queue'],server['maxplayers']]
-            if server['id']==8:
-                detail_a=[server['players'],server['queue'],server['maxplayers']]
-            if server['id']==31:
-                detail_p=[server['players'],server['queue'],server['maxplayers']]
-        ans=["服务器当前状况:\nS1服:",detail_s1[0],'+',detail_s1[1],'/',detail_s1[2],'\nS2服:',detail_s2[0],'+',detail_s2[1],'/',detail_s2[2],'\nA服:',detail_a[0],'+',detail_a[1],'/',detail_a[2],'\nP服:',detail_p[0],'+',detail_p[1],'/',detail_p[2]]
-        ans=[str(i) for i in ans]
-        await tmp.finish(''.join(ans))
-    if re.match('s1(服)?',str(id),re.I):
-        response=get('https://traffic.krashnz.com/ets2/sim1')
-        response=response.text
-        ans=['查询完成:\n加来小道:',search_city(response,134),'\n加来城区:',search_city(response,55),'\n杜伊斯堡',search_city(response,14)]
-        await tmp.finish(''.join(ans))
-        
-    if re.match('p(服)?',str(id),re.I):
-        response=get('https://traffic.krashnz.com/promods/pm')
-        response=response.text
-        ans=['查询完成:\n矿山:',search_city(response,793)]
-        await tmp.finish(''.join(ans))
-    if not(str(id).isdigit()):
-        await tmp.finish("id输入错误！")
-    url="https://api.truckersmp.com/v2/player/"+str(id)
-    response=get(url)
-    if response.status_code==404 or response.json()['error']:
-        await tmp.finish("查询失败，请联系管理员")
-    ans=["查询完成\nTMPid:",str(response.json()['response']['id']),"\n名称:",response.json()['response']['name'],"\n所属车队:",null_check(response.json()['response']['vtc']['name']),"\nSteamid:",str(response.json()['response']['steamID']),"\n加入日期",response.json()['response']['joinDate'],"\n是否封禁:",if_ban(response.json()['response']['banned'],response.json()['response']['bannedUntil'])]
-    await tmp.finish(''.join(ans))
+def to_string_if_on(a: bool):
+    if a:
+        return '在线'
+    return '离线'
+
+
+lot_of_parrel = '='*19
+
+
+@tmp_id.handle()
+async def handle_function(event: MessageEvent, args: Message = CommandArg()):
+    id = args.extract_plain_text()
+    if not (str(id).isdigit()):
+        await tmp_id.finish("id输入错误！")
+    url = "https://api.truckersmp.com/v2/player/"+str(id)
+    response = get(url)
+    if response.status_code == 404 or response.json()['error']:
+        await tmp_id.finish("查询失败，请重新输入")
+    ans = ["查询完成\nTMPID:", str(response.json()['response']['id']), "\n玩家名称:", response.json()['response']['name'], '\n玩家类别:', response.json()['response']['groupName'], '\n注册时间:', response.json()['response']['joinDate'], "\n是否封禁:", if_ban(response.json()['response']['banned'], response.json()[
+        'response']['bannedUntil']), '\n年内封禁:', str(response.json()['response']['bansCount']), '\nTMP链接:https://truckersmp.com/user/', str(id), '\nSteam链接:https://steamcommunity.com/profiles/', response.json()['response']['steamID'], "\n所属车队:", null_check(response.json()['response']['vtc']['name'])]
+    await tmp_id.finish(''.join(ans))
+
+
+@tmp_road.handle()
+async def handle_function(event: MessageEvent, args: Message = CommandArg()):
+    id = args.extract_plain_text()
+    if re.match('s1(服)?', str(id), re.I):
+        response = get('https://traffic.krashnz.com/ets2/sim1')
+        response = response.text
+        ans = ['地区:加来-杜伊斯堡道路\n', search_city(response, 134), '\n', lot_of_parrel, '\n地区:加来\n', search_city(response, 55), '\n',
+               lot_of_parrel, '\n地区:杜伊斯堡\n', search_city(response, 14), '\n', lot_of_parrel, '\n地区:杜塞尔多夫\n', search_city(response, 15)]
+        await tmp_road.finish(''.join(ans))
+    if re.match('p(服)?', str(id), re.I):
+        response = get('https://traffic.krashnz.com/promods/pm')
+        response = response.text
+        ans = ['地区:希尔科内斯城市\n', search_city(
+            response, 615), '\n', lot_of_parrel, '\n地区:希尔科内斯-采石场\n', search_city(response, 793)]
+        await tmp_road.finish(''.join(ans))
+    tmp_road.finish('输入无效')
+
+
+@tmp_sever.handle()
+async def handle_function(event: MessageEvent, args: Message = CommandArg()):
+    response = get('https://api.truckersmp.com/v2/servers')
+    detail = [[], [], [], []]
+    server_status = [[], [], [], []]
+    server_max_player = [0, 0, 0, 0]
+    server_player = [0, 0, 0, 0]
+    total = 0
+    for server in response.json()['response']:
+        if server['id'] == 4:
+            server_player[0] = server['players']
+            server_max_player[0] = server['maxplayers']
+            server_status[0] = 1
+        if server['id'] == 41:
+            server_player[1] = server['players']
+            server_max_player[1] = server['maxplayers']
+            server_status[1] = 1
+        if server['id'] == 8:
+            server_player[2] = server['players']
+            server_max_player[2] = server['maxplayers']
+            server_status[2] = 1
+        if server['id'] == 31:
+            server_player[3] = server['players']
+            server_max_player[3] = server['maxplayers']
+            server_status[3] = 1
+        total += server['players']
+    ans = '在线玩家:'+str(total)+'\n'
+    servers = ['Simulation1', 'Simulation2', 'Arcade', 'Promods']
+    for i in range(4):
+        ans += lot_of_parrel+'\n地区:'+servers[i]+'\n状态:'+to_string_if_on(
+            server_status[i])+'\n人数:'+str(server_player[i])+'/'+str(server_max_player[i])+'\n'
+    await tmp_sever.finish(ans)
