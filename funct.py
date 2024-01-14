@@ -49,7 +49,7 @@ def to_string_if_on(a: bool):
 def insert_or_replace_qq_id_tmp_id(qq_id, tmp_id):
     tmpid_table[str(qq_id)] = tmp_id
     with open("tmpid_table.json","w") as fi:
-        dump(tmpid_table)
+        dump(tmpid_table,fi)
 
 
 def find_tmp_id(qq_id):
