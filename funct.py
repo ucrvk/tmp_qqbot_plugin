@@ -1,9 +1,11 @@
 from httpx import get
 import re
 from bs4 import BeautifulSoup
-import psycopg2
+from json import load, dump
 
-databaseInfo = ("uname", "zhenxun")
+tmpid_table: dict = {}
+with open("tmpid_table.json", "r") as fi:
+    tmpid_table = load(fi)
 
 
 def search_city(html, id):
@@ -21,9 +23,9 @@ def search_city(html, id):
     return " ".join(["路况:", status, "| 玩家:"] + cars)
 
 
-def if_ban(a: bool, b: str):
+def if_ban(a: bool):
     if a:
-        return "是\n解禁时间:" + b
+        return "是\n"
     return "否"
 
 
@@ -45,44 +47,13 @@ def to_string_if_on(a: bool):
 
 
 def insert_or_replace_qq_id_tmp_id(qq_id, tmp_id):
-    conn = psycopg2.connect(
-        database="",
-        user="",
-        password="",
-    )
-    cursor = conn.cursor()
-    try:
-        conn.autocommit = False
-        sql = "INSERT INTO tmp_info (qq_id, tmp_id) VALUES (%s, %s) ON CONFLICT (qq_id) DO UPDATE SET tmp_id = EXCLUDED.tmp_id;"
-        cursor.execute(sql, (qq_id, tmp_id))
-        conn.commit()
-        return True
-    except (Exception, psycopg2.Error) as error:
-        conn.rollback()
-        return False
-    finally:
-        cursor.close()
-        conn.close()
+    tmpid_table[str(qq_id)] = tmp_id
+    with open("tmpid_table.json","w") as fi:
+        dump(tmpid_table)
 
 
 def find_tmp_id(qq_id):
-    conn = psycopg2.connect(
-        database="",
-        user="",
-        password="",
-    )
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT tmp_id FROM tmp_info WHERE qq_id = %s", (qq_id,))
-        result = cur.fetchone()
-        if result is not None:
-            tmp_id = result[0]
-        else:
-            tmp_id = -1
-        cur.close()
-        return tmp_id
-    finally:
-        conn.close()
+    return tmpid_table.get(str(qq_id),-1)
 
 
 def succesfullySearchReturn(response):
@@ -96,14 +67,11 @@ def succesfullySearchReturn(response):
         "\n注册时间:",
         response.json()["response"]["joinDate"],
         "\n是否封禁:",
-        if_ban(
-            response.json()["response"]["banned"],
-            response.json()["response"]["bannedUntil"],
-        ),
+        if_ban(response.json()["response"]["banned"]),
         "\n年内封禁:",
         str(response.json()["response"]["bansCount"]),
         "\n所属车队:",
         null_check(response.json()["response"]["vtc"]["name"]),
-        ]
+    ]
     """, '\nTMP链接:https://truckersmp.com/user/', str(id), '\nSteam链接:https://steamcommunity.com/profiles/', response.json()['response']['steamID']""",
     return "".join(ans)
