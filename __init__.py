@@ -1,5 +1,5 @@
-from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Message, MessageEvent
+from nonebot import on_command, matcher
+from nonebot.adapters.satori import Message, MessageEvent, MessageSegment
 from nonebot.params import CommandArg
 from .funct import *
 
@@ -36,34 +36,38 @@ lot_of_parrel = "=" * 19
 async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     id = args.extract_plain_text()
     if not str(id):
-        id = find_tmp_id(event.user_id)
+        id = find_tmp_id(event.get_user_id())
         if id == -1:
-            await tmp_id.finish('您还没有绑定您的id，请使用"/绑定+id"来绑定', at_sender=True)
+            await tmp_id.finish(
+                '您还没有绑定您的id，请使用"/绑定+id"来绑定', at_sender=True
+            )
         else:
             if not (str(id).isdigit()):
-                await tmp_id.finish("数据库错误，请尝试重新绑定。若仍然无效，清联系管理")
+                await tmp_id.finish(
+                    "数据库错误，请尝试重新绑定。若仍然无效，清联系管理"
+                )
             url = "https://api.truckersmp.com/v2/player/" + str(id)
             response = get(url)
             if response.status_code == 404 or response.json()["error"]:
                 await tmp_id.finish("查询失败，查询目标不存在")
-                await tmp_id.finish(succesfullySearchReturn(response), at_sender=True)
+            await tmp_id.finish(succesfullySearchReturn(response))
     if not (str(id).isdigit()):
         await tmp_id.finish("id输入错误！")
     url = "https://api.truckersmp.com/v2/player/" + str(id)
     response = get(url)
     if response.status_code == 404 or response.json()["error"]:
         await tmp_id.finish("查询失败，查询目标不存在")
-    await tmp_id.finish(succesfullySearchReturn(response), at_sender=True)
+    await tmp_id.finish(succesfullySearchReturn(response))
 
 
 @tmp_bind.handle()
 async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     tmpId = args.extract_plain_text()
     if not (str(tmpId).isdigit()):
-        await tmp_bind.finish("绑定失败，输入的不是tmpId", at_sender=True)
-    if insert_or_replace_qq_id_tmp_id(event.user_id, int(tmpId)):
+        await tmp_bind.finish("绑定失败，输入的不是tmpId")
+    if insert_or_replace_qq_id_tmp_id(event.get_user_id(), int(tmpId)):
         await tmp_bind.finish("绑定成功", at_sender=True)
-    await tmp_bind.finish("绑定失败，数据库错误", at_sender=True)
+    await tmp_bind.finish("绑定失败，数据库错误")
 
 
 @tmp_road.handle()

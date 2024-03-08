@@ -2,6 +2,7 @@ from httpx import get
 import re
 from bs4 import BeautifulSoup
 from json import load, dump
+from nonebot.exception import ProcessException
 
 tmpid_table: dict = {}
 with open("tmpid_table.json", "r") as fi:
@@ -47,9 +48,13 @@ def to_string_if_on(a: bool):
 
 
 def insert_or_replace_qq_id_tmp_id(qq_id, tmp_id):
-    tmpid_table[str(qq_id)] = tmp_id
-    with open("tmpid_table.json","w") as fi:
-        dump(tmpid_table,fi)
+    try:
+        tmpid_table[str(qq_id)] = tmp_id
+        with open("tmpid_table.json","w") as fi:
+            dump(tmpid_table,fi)
+            return True
+    except Exception as e:
+        return False
 
 
 def find_tmp_id(qq_id):
